@@ -66,28 +66,52 @@ pipeline {
     stage('Build & Push Image') {
       steps {
         script {
-          def build   = env.BUILD_NUMBER
+          def build    = env.BUILD_NUMBER
           def fullName = "${DOCKERHUB_NAMESPACE}/${IMAGE_NAME}"
 
           // La imagen es el binario entregable: se construye una vez y se
           // etiqueta varias veces para dar trazabilidad al mismo artefacto.
-          def image = docker.build(
-            "${fullName}:${build}",
-            "--build-arg APP_VERSION=${build} --build-arg GIT_SHA=${env.GIT_SHA} ."
-          )
+          sh """
+            docker build -t ${fullName}:${build} \\
+              --build-arg APP_VERSION=${build} \\
+              --build-arg GIT_SHA=${env.GIT_SHA} .
+          """
 
-          docker.withRegistry("https://${REGISTRY}", 'dockerhub-creds') {
-            image.push()                        // numero de build
-            image.push("sha-${env.GIT_SHA}")    // trazabilidad al commit
+          // Se usa withCredentials + 'docker login' sin URL en lugar de
+          // docker.withRegistry(): el plugin se autentica contra
+          // https://docker.io, que emite un token sin permiso de escritura,
+          // mientras que el login por defecto apunta a index.docker.io.
+          // Ademas --password-stdin evita exponer el token en la linea de comandos.
+          withCredentials([usernamePassword(
+              credentialsId: 'dockerhub-creds',
+              usernameVariable: 'DH_USER',
+              passwordVariable: 'DH_PASS')]) {
+
+            sh """
+              set -e
+              echo "\$DH_PASS" | docker login -u "\$DH_USER" --password-stdin
+
+              docker tag ${fullName}:${build} ${fullName}:sha-${env.GIT_SHA}
+              docker push ${fullName}:${build}
+              docker push ${fullName}:sha-${env.GIT_SHA}
+            """
 
             // 'latest' solo desde la rama principal: evita que una rama de
             // trabajo sobreescriba la version que todos descargan por defecto.
-            if (env.BRANCH_NAME == null || env.BRANCH_NAME == 'main') {
-              image.push('latest')
+            script {
+              if (env.BRANCH_NAME == null || env.BRANCH_NAME == 'main') {
+                sh """
+                  docker tag ${fullName}:${build} ${fullName}:latest
+                  docker push ${fullName}:latest
+                """
+                env.PUBLISHED_TAGS = "${build}, sha-${env.GIT_SHA}, latest"
+              } else {
+                env.PUBLISHED_TAGS = "${build}, sha-${env.GIT_SHA}"
+              }
             }
-          }
 
-          env.PUBLISHED_TAGS = "${build}, sha-${env.GIT_SHA}"
+            sh 'docker logout'
+          }
         }
       }
     }
@@ -103,6 +127,7 @@ pipeline {
     always {
       // Las imagenes intermedias llenan el disco del agente si no se limpian.
       sh "docker image rm -f ${DOCKERHUB_NAMESPACE}/${IMAGE_NAME}:${env.BUILD_NUMBER} || true"
+      sh "docker image rm -f ${DOCKERHUB_NAMESPACE}/${IMAGE_NAME}:sha-${env.GIT_SHA} || true"
       sh "docker image prune -f || true"
       cleanWs()
     }
