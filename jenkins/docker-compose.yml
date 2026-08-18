@@ -1,0 +1,28 @@
+# =========================================================
+#  Stack de Jenkins para el Reto 2
+#
+#  Levanta el controller con Docker CLI y le monta el socket
+#  del host, de modo que el pipeline pueda construir y
+#  publicar imagenes sin instalar un Docker anidado.
+# =========================================================
+
+services:
+  jenkins:
+    build: .
+    container_name: jenkins
+    restart: unless-stopped
+    ports:
+      - "8081:8080"      # UI de Jenkins (8080 queda libre para el microservicio)
+      - "50000:50000"    # puerto de agentes JNLP
+    environment:
+      JAVA_OPTS: "-Djenkins.install.runSetupWizard=true -Duser.timezone=America/Mexico_City"
+    volumes:
+      - jenkins_home:/var/jenkins_home
+      # Socket del host: permite Docker-outside-of-Docker
+      - /var/run/docker.sock:/var/run/docker.sock
+    group_add:
+      - "0"              # acceso al socket en Docker Desktop (macOS)
+
+volumes:
+  jenkins_home:
+    name: jenkins_home

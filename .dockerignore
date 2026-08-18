@@ -1,0 +1,6 @@
+.git
+.github
+.mvn
+*.md
+target/*
+!target/*.jar
