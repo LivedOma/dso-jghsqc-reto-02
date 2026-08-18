@@ -4,7 +4,7 @@
 #  entregable que despues se despliega en cualquier ambiente.
 # =========================================================
 
-FROM eclipse-temurin:17-jre-alpine
+FROM eclipse-temurin:17-jre
 
 # Metadatos trazables (los inyecta GitHub Actions via build-args)
 ARG APP_VERSION=local
@@ -16,7 +16,7 @@ LABEL org.opencontainers.image.title="demo-micro" \
 ARG JAR_FILE=target/*.jar
 
 # Buena practica de seguridad del curso: el contenedor NO corre como root
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+RUN groupadd -r appgroup && useradd -r -g appgroup appuser
 
 WORKDIR /opt/app
 COPY ${JAR_FILE} /opt/app/app.jar

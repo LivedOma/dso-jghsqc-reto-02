@@ -15,7 +15,7 @@ services:
       - "8081:8080"      # UI de Jenkins (8080 queda libre para el microservicio)
       - "50000:50000"    # puerto de agentes JNLP
     environment:
-      JAVA_OPTS: "-Djenkins.install.runSetupWizard=true -Duser.timezone=America/Mexico_City"
+      JAVA_OPTS: "-Djenkins.install.runSetupWizard=false -Duser.timezone=America/Mexico_City"
     volumes:
       - jenkins_home:/var/jenkins_home
       # Socket del host: permite Docker-outside-of-Docker

@@ -9,6 +9,6 @@ credentials-binding
 matrix-auth
 junit
 ws-cleanup
-timestamps
+timestamper
 ansicolor
 configuration-as-code
