@@ -2,11 +2,15 @@
 #  Dockerfile - demo-micro
 #  La imagen ES el binario: lo que se construye aqui es el
 #  entregable que despues se despliega en cualquier ambiente.
+#
+#  Base multi-arquitectura (amd64 + arm64): la variante
+#  alpine de eclipse-temurin solo publica amd64, por lo que
+#  falla al construir en agentes ARM (Apple Silicon).
 # =========================================================
 
 FROM eclipse-temurin:17-jre
 
-# Metadatos trazables (los inyecta GitHub Actions via build-args)
+# Metadatos trazables (los inyecta el pipeline via build-args)
 ARG APP_VERSION=local
 ARG GIT_SHA=unknown
 LABEL org.opencontainers.image.title="demo-micro" \
@@ -29,7 +33,9 @@ ENV APP_VERSION=${APP_VERSION} \
 
 EXPOSE 8080
 
-HEALTHCHECK --interval=30s --timeout=3s --start-period=30s --retries=3 \
-  CMD wget -q --spider http://localhost:8080/actuator/health || exit 1
+# Java 17 trae jcmd/jwebserver pero no curl ni wget en la imagen slim:
+# se usa una conexion TCP nativa de bash para la probe.
+HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
+  CMD bash -c 'exec 3<>/dev/tcp/localhost/8080' || exit 1
 
 ENTRYPOINT ["sh","-c","java $JAVA_OPTS -jar /opt/app/app.jar"]
